@@ -1,0 +1,433 @@
+:root {
+  --blue: #2f98df;
+  --blue-dark: #247fbe;
+  --line: #bfc4c7;
+  --text: #4b5358;
+  --muted: #747c81;
+  --row: #f7f7f7;
+  --row-alt: #ededed;
+  --green: #0a8b21;
+  --red: #e52320;
+  --lime: #8bc300;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #fff;
+  color: var(--text);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
+}
+
+.container {
+  width: min(94vw, 1500px);
+  margin: 0 auto;
+}
+
+.topbar {
+  border-bottom: 1px solid #e3e6e8;
+  background: #fff;
+}
+
+.navline {
+  display: flex;
+  min-height: 62px;
+  align-items: center;
+  gap: 36px;
+}
+
+.brand {
+  color: #15426c;
+  font-size: 24px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  font-size: 15px;
+}
+
+nav a {
+  color: #43515a;
+  text-decoration: none;
+}
+
+.page {
+  padding: 34px 0 42px;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  border-bottom: 1px solid #d5d9dc;
+  margin-bottom: 22px;
+}
+
+.tab {
+  min-height: 45px;
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  background: #fff;
+  color: #2d3d49;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.tab.active {
+  border-color: #d5d9dc;
+  border-top: 3px solid var(--blue);
+  color: #111;
+  font-weight: 600;
+}
+
+.intro {
+  margin: 0 0 22px;
+  color: #555;
+  line-height: 1.5;
+}
+
+.search-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.stock-search {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  min-width: min(520px, 100%);
+  color: #444;
+}
+
+input[type="search"] {
+  height: 41px;
+  border: 1px solid #cfd3d6;
+  border-radius: 4px;
+  color: #4b5358;
+  font-size: 18px;
+  padding: 8px 12px;
+  outline: none;
+}
+
+input[type="search"]:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(47, 152, 223, 0.16);
+}
+
+.suggestions {
+  position: absolute;
+  z-index: 20;
+  top: 70px;
+  left: 0;
+  right: 0;
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid #cbd1d5;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(28, 43, 52, 0.16);
+}
+
+.suggestion {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #edf0f2;
+  background: #fff;
+  color: #35424b;
+  cursor: pointer;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.suggestion:hover,
+.suggestion:focus {
+  background: #eef7fe;
+}
+
+.suggestion strong {
+  display: block;
+  font-size: 15px;
+}
+
+.suggestion span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.active-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 41px;
+  color: #59636a;
+}
+
+.stock-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  margin: 8px 0 18px;
+}
+
+.stock-title h1 {
+  display: inline;
+  margin: 0;
+  color: #333;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.stock-title em {
+  color: #777;
+  font-size: 15px;
+}
+
+.fund-heading {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.back-link {
+  width: fit-content;
+  border: 1px solid #cfd5d9;
+  border-radius: 4px;
+  background: #fff;
+  color: #35424b;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 8px 12px;
+}
+
+.back-link:hover {
+  background: #f4f8fb;
+}
+
+.empty {
+  border: 1px solid #d7dcdf;
+  background: #f7f9fa;
+  padding: 16px;
+}
+
+.summary-wrap {
+  max-width: 880px;
+  margin-bottom: 12px;
+}
+
+.table-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.download {
+  min-width: 190px;
+  min-height: 45px;
+  border: 2px solid var(--lime);
+  border-radius: 2px;
+  background: #fff;
+  color: #3d454b;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.download:hover {
+  background: #f7ffe4;
+}
+
+.table-actions input {
+  width: 220px;
+}
+
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.rv-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--text);
+  font-size: 18px;
+}
+
+.rv-table th {
+  border: 1px solid var(--line);
+  background: var(--blue);
+  color: #fff;
+  font-weight: 400;
+  line-height: 1.2;
+  padding: 10px 8px;
+  text-align: center;
+  vertical-align: bottom;
+}
+
+.rv-table td {
+  border: 1px solid var(--line);
+  background: var(--row);
+  padding: 9px 8px;
+  vertical-align: middle;
+}
+
+.rv-table tbody tr:nth-child(even) td {
+  background: var(--row-alt);
+}
+
+.rv-table a {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.center {
+  text-align: center;
+}
+
+.fund-name {
+  min-width: 360px;
+}
+
+.fund-family {
+  min-width: 220px;
+}
+
+.badge {
+  display: inline-block;
+  min-width: 72px;
+  border-radius: 3px;
+  padding: 4px 7px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.badge-new_buy,
+.badge-add {
+  background: var(--green);
+}
+
+.badge-trim_sell,
+.badge-exit {
+  background: var(--red);
+}
+
+.badge-hold {
+  background: #7a858c;
+}
+
+.badge-unknown {
+  background: #9aa2a8;
+}
+
+.summary-table {
+  font-size: 16px;
+}
+
+.summary-table th,
+.summary-table td {
+  padding: 8px;
+}
+
+.up,
+.down {
+  display: inline-block;
+  font-size: 16px;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.up {
+  color: var(--green);
+}
+
+.down {
+  color: var(--red);
+}
+
+.note-line {
+  margin: 4px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.source-strip {
+  margin-top: 28px;
+  border-top: 1px solid #e1e5e8;
+  padding-top: 14px;
+  color: #667078;
+  font-size: 13px;
+}
+
+#sourceFiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.source-pill {
+  border: 1px solid #d6dce0;
+  border-radius: 999px;
+  background: #fafafa;
+  padding: 5px 9px;
+}
+
+.hidden-row {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .navline {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 0;
+  }
+
+  .tabs {
+    display: block;
+  }
+
+  .tab {
+    width: 100%;
+    border: 1px solid #d5d9dc;
+    text-align: left;
+  }
+
+  .table-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .download,
+  .table-actions input {
+    width: 100%;
+  }
+
+  .rv-table {
+    font-size: 15px;
+  }
+}

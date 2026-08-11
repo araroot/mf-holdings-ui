@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MF Stock Holdings</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container navline">
+        <div class="brand">RupeeVest Local</div>
+        <nav>
+          <a href="#holdings">Stocks held by Mutual Funds</a>
+          <a href="#buying">Stocks attracting Fund Managers</a>
+          <a href="#selling">Stocks seeing Selling Pressure</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container page">
+      <div class="tabs" role="tablist" aria-label="MF holdings views">
+        <button class="tab active" type="button" data-tab="holdings">Stocks held by Mutual Funds</button>
+        <button class="tab" type="button" data-tab="buying">Stocks attracting Fund Managers</button>
+        <button class="tab" type="button" data-tab="selling">Stocks seeing Selling Pressure</button>
+        <button class="tab" id="fundTab" type="button" data-tab="fund" hidden>Fund Trades</button>
+      </div>
+
+      <section class="panel active" id="holdings" role="tabpanel">
+        <p class="intro">
+          Search a stock held by mutual funds and inspect the holding trend across the latest four local MF month-end dumps.
+        </p>
+
+        <div class="search-row">
+          <label class="stock-search">
+            <span>Stock Name:</span>
+            <input id="stockSearch" type="search" placeholder="Search for Stocks here" autocomplete="off">
+            <div id="suggestions" class="suggestions" hidden></div>
+          </label>
+          <label class="active-toggle">
+            <input id="activeOnly" type="checkbox" checked>
+            Active schemes only
+          </label>
+        </div>
+
+        <div class="stock-title">
+          <span>Stock Name:&nbsp;</span>
+          <h1 id="stockName">Select a stock</h1>
+          <em id="asOf"></em>
+        </div>
+
+        <div id="emptyMessage" class="empty" hidden>No Mutual Fund Holding found in this stock.</div>
+
+        <div id="holdingsContent" hidden>
+          <div class="summary-wrap">
+            <table class="rv-table summary-table" id="summaryTable"></table>
+          </div>
+
+          <div class="note-line">
+            <span class="up">▲</span> <span class="down">▼</span>
+            indicates an increase or decrease in shareholding as compared to last month.
+          </div>
+          <div class="note-line">Note: Shareholding has NOT been adjusted for outstanding derivative positions, if any.</div>
+
+          <div class="table-actions">
+            <button class="download" type="button" data-download="holdings">Download</button>
+            <input id="fundFilter" type="search" placeholder="Search Here">
+          </div>
+
+          <div class="table-wrap">
+            <table class="rv-table holdings-table" id="holdingsTable"></table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="buying" role="tabpanel" hidden>
+        <p id="buyingIntro" class="intro"></p>
+        <div class="table-actions">
+          <button class="download" type="button" data-download="buying">Download</button>
+          <input id="buyingFilter" type="search" placeholder="Search Here">
+        </div>
+        <div class="table-wrap">
+          <table class="rv-table movers-table" id="buyingTable"></table>
+        </div>
+        <div class="note-line">* Buy value is an approximation from local MF market value deltas and may vary from actual figures.</div>
+      </section>
+
+      <section class="panel" id="selling" role="tabpanel" hidden>
+        <p id="sellingIntro" class="intro"></p>
+        <div class="table-actions">
+          <button class="download" type="button" data-download="selling">Download</button>
+          <input id="sellingFilter" type="search" placeholder="Search Here">
+        </div>
+        <div class="table-wrap">
+          <table class="rv-table movers-table" id="sellingTable"></table>
+        </div>
+        <div class="note-line">* Sell value is an approximation from local MF market value deltas and may vary from actual figures.</div>
+      </section>
+
+      <section class="panel" id="fund" role="tabpanel" hidden>
+        <div class="fund-heading">
+          <button class="back-link" type="button" id="backToHoldings">Back to stock holdings</button>
+          <div class="stock-title">
+            <span>Fund Name:&nbsp;</span>
+            <h1 id="fundName">Select a fund</h1>
+            <em id="fundAsOf"></em>
+          </div>
+        </div>
+        <div id="fundEmptyMessage" class="empty" hidden>No fund holdings found for this scheme.</div>
+        <div id="fundContent" hidden>
+          <div class="summary-wrap">
+            <table class="rv-table summary-table" id="fundSummaryTable"></table>
+          </div>
+          <p id="fundIntro" class="intro"></p>
+          <div class="table-actions">
+            <button class="download" type="button" data-download="fund">Download</button>
+            <input id="fundTradeFilter" type="search" placeholder="Search Here">
+          </div>
+          <div class="table-wrap">
+            <table class="rv-table fund-trades-table" id="fundTradesTable"></table>
+          </div>
+          <div class="note-line">Actions compare the latest shown month with the immediately previous month.</div>
+        </div>
+      </section>
+
+      <section class="source-strip" aria-label="Source files">
+        <strong>Source files</strong>
+        <div id="sourceFiles"></div>
+      </section>
+    </main>
+
+    <script>window.STATIC_DATA_BASE = "./data";</script>
+    <script src="./app.js"></script>
+  </body>
+</html>

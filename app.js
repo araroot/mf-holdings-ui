@@ -1,0 +1,548 @@
+const state = {
+  meta: null,
+  currentStock: null,
+  holdingsRows: [],
+  buyingRows: [],
+  sellingRows: [],
+  fundRows: [],
+};
+
+const els = {
+  stockSearch: document.querySelector("#stockSearch"),
+  suggestions: document.querySelector("#suggestions"),
+  activeOnly: document.querySelector("#activeOnly"),
+  stockName: document.querySelector("#stockName"),
+  asOf: document.querySelector("#asOf"),
+  emptyMessage: document.querySelector("#emptyMessage"),
+  holdingsContent: document.querySelector("#holdingsContent"),
+  summaryTable: document.querySelector("#summaryTable"),
+  holdingsTable: document.querySelector("#holdingsTable"),
+  fundFilter: document.querySelector("#fundFilter"),
+  buyingIntro: document.querySelector("#buyingIntro"),
+  sellingIntro: document.querySelector("#sellingIntro"),
+  buyingTable: document.querySelector("#buyingTable"),
+  sellingTable: document.querySelector("#sellingTable"),
+  fundTab: document.querySelector("#fundTab"),
+  fundName: document.querySelector("#fundName"),
+  fundAsOf: document.querySelector("#fundAsOf"),
+  fundEmptyMessage: document.querySelector("#fundEmptyMessage"),
+  fundContent: document.querySelector("#fundContent"),
+  fundSummaryTable: document.querySelector("#fundSummaryTable"),
+  fundIntro: document.querySelector("#fundIntro"),
+  fundTradesTable: document.querySelector("#fundTradesTable"),
+  fundTradeFilter: document.querySelector("#fundTradeFilter"),
+  backToHoldings: document.querySelector("#backToHoldings"),
+  buyingFilter: document.querySelector("#buyingFilter"),
+  sellingFilter: document.querySelector("#sellingFilter"),
+  sourceFiles: document.querySelector("#sourceFiles"),
+};
+
+init();
+
+async function init() {
+  state.meta = await api("/api/meta");
+  renderSources();
+  bindEvents();
+  const first = await api("/api/search?q=");
+  if (first.length) {
+    await selectStock(first[0]);
+  }
+  await loadMovers();
+}
+
+function bindEvents() {
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => switchTab(tab.dataset.tab));
+  });
+
+  els.stockSearch.addEventListener("input", debounce(showSuggestions, 140));
+  els.stockSearch.addEventListener("focus", showSuggestions);
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".stock-search")) {
+      els.suggestions.hidden = true;
+    }
+  });
+
+  els.activeOnly.addEventListener("change", async () => {
+    if (state.currentStock) {
+      await selectStock(state.currentStock);
+      await loadMovers();
+    }
+  });
+
+  els.fundFilter.addEventListener("input", () => filterTable(els.holdingsTable, els.fundFilter.value));
+  els.buyingFilter.addEventListener("input", () => filterTable(els.buyingTable, els.buyingFilter.value));
+  els.sellingFilter.addEventListener("input", () => filterTable(els.sellingTable, els.sellingFilter.value));
+  els.fundTradeFilter.addEventListener("input", () => filterTable(els.fundTradesTable, els.fundTradeFilter.value));
+  els.backToHoldings.addEventListener("click", () => switchTab("holdings"));
+
+  document.querySelectorAll("[data-download]").forEach((button) => {
+    button.addEventListener("click", () => downloadCsv(button.dataset.download));
+  });
+}
+
+async function showSuggestions() {
+  const q = els.stockSearch.value.trim();
+  const results = await api(`/api/search?q=${encodeURIComponent(q)}`);
+  els.suggestions.innerHTML = results
+    .map(
+      (item) => `
+        <button class="suggestion" type="button" data-symbol="${escapeAttr(item.symbol)}">
+          <strong>${escapeHtml(item.instrument_name)}</strong>
+          <span>${escapeHtml(item.symbol)} · ${formatNumber(item.fund_count)} funds</span>
+        </button>`
+    )
+    .join("");
+  els.suggestions.hidden = results.length === 0;
+  els.suggestions.querySelectorAll(".suggestion").forEach((button, idx) => {
+    button.addEventListener("click", () => selectStock(results[idx]));
+  });
+}
+
+async function selectStock(stock) {
+  state.currentStock = stock;
+  els.stockSearch.value = stock.label || `${stock.instrument_name} (${stock.symbol})`;
+  els.suggestions.hidden = true;
+  els.stockName.textContent = stock.instrument_name || stock.symbol;
+  els.asOf.textContent = "Loading...";
+
+  const payload = await api(`/api/holdings?stock=${encodeURIComponent(stock.symbol)}&active=${activeFlag()}`);
+  if (!payload.found) {
+    els.asOf.textContent = "";
+    els.holdingsContent.hidden = true;
+    els.emptyMessage.hidden = false;
+    state.holdingsRows = [];
+    return;
+  }
+
+  state.holdingsRows = payload.rows;
+  els.emptyMessage.hidden = true;
+  els.holdingsContent.hidden = false;
+  els.stockName.textContent = `${payload.stock.name}.`;
+  els.asOf.textContent = `(As on ${payload.months[0].label})`;
+  renderSummary(payload);
+  renderHoldings(payload);
+}
+
+async function loadMovers() {
+  const [buying, selling] = await Promise.all([
+    api(`/api/movers?side=buy&active=${activeFlag()}&limit=100`),
+    api(`/api/movers?side=sell&active=${activeFlag()}&limit=100`),
+  ]);
+  state.buyingRows = buying.rows;
+  state.sellingRows = selling.rows;
+  els.buyingIntro.textContent =
+    `Below is a list of stocks which have witnessed net mutual fund buying for ${buying.latest}, compared with ${buying.previous}.`;
+  els.sellingIntro.textContent =
+    `Below is a list of stocks which have witnessed net mutual fund selling for ${selling.latest}, compared with ${selling.previous}.`;
+  renderMovers(els.buyingTable, buying.rows, "buy");
+  renderMovers(els.sellingTable, selling.rows, "sell");
+}
+
+function renderSummary(payload) {
+  const monthHeads = payload.months.map((month) => `<th>${escapeHtml(month.label)}</th>`).join("");
+  const monthCells = payload.months
+    .map((month) => {
+      const cell = payload.summary.months[String(month.month)] || { shares: 0, marker: "" };
+      return `<td class="num">${formatNumber(cell.shares)}${marker(cell.marker)}</td>`;
+    })
+    .join("");
+  els.summaryTable.innerHTML = `
+    <thead>
+      <tr>
+        <th rowspan="2">Sector</th>
+        <th rowspan="2">No. of Funds</th>
+        <th colspan="${payload.months.length}">No. of Shares</th>
+      </tr>
+      <tr>${monthHeads}</tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>${escapeHtml(payload.summary.sector)}</td>
+        <td class="center">${formatNumber(payload.summary.funds)}</td>
+        ${monthCells}
+      </tr>
+    </tbody>`;
+}
+
+function renderHoldings(payload) {
+  const months = payload.months;
+  const topHeader = months
+    .map((month, idx) => {
+      if (idx === 0) {
+        return `<th colspan="3">${escapeHtml(month.label)}</th>`;
+      }
+      return `<th>${escapeHtml(month.label)}</th>`;
+    })
+    .join("");
+  const subHeader = months
+    .map((month, idx) => {
+      if (idx === 0) {
+        return "<th>AUM (in ₹ cr)</th><th>% of AUM</th><th>No. of Shares</th>";
+      }
+      return "<th>No. of Shares</th>";
+    })
+    .join("");
+
+  const body = payload.rows
+    .map((row) => {
+      const monthCells = months
+        .map((month, idx) => {
+      const cell = row.months[String(month.month)] || { shares: null, marker: "" };
+          if (idx === 0) {
+            return `
+              <td class="num">${row.aum_cr == null ? "-" : formatDecimal(row.aum_cr, 1)}</td>
+              <td class="num">${row.holding_pct == null ? "-" : formatDecimal(row.holding_pct, 2)}</td>
+              <td class="num">${formatMaybeNumber(cell.shares)}${marker(cell.marker)}</td>`;
+          }
+          return `<td class="num">${formatMaybeNumber(cell.shares)}${marker(cell.marker)}</td>`;
+        })
+        .join("");
+      return `
+        <tr>
+          <td class="fund-name">
+            <a href="#" data-fund-code="${escapeAttr(row.scheme_code)}" data-fund-name="${escapeAttr(row.fund_name)}">
+              ${escapeHtml(row.fund_name)}
+            </a>
+          </td>
+          <td class="fund-family">${escapeHtml(row.fund_family || "Unavailable")}</td>
+          ${monthCells}
+        </tr>`;
+    })
+    .join("");
+
+  els.holdingsTable.innerHTML = `
+    <thead>
+      <tr>
+        <th rowspan="2">Fund Name</th>
+        <th rowspan="2">Fund Manager / Family</th>
+        ${topHeader}
+      </tr>
+      <tr>${subHeader}</tr>
+    </thead>
+    <tbody>${body}</tbody>`;
+  els.holdingsTable.querySelectorAll("[data-fund-code]").forEach((link) => {
+    link.addEventListener("click", async (event) => {
+      event.preventDefault();
+      await selectFund(link.dataset.fundCode, link.dataset.fundName);
+    });
+  });
+  filterTable(els.holdingsTable, els.fundFilter.value);
+}
+
+async function selectFund(schemeCode, fundName) {
+  els.fundTab.hidden = false;
+  els.fundName.textContent = fundName || "Loading...";
+  els.fundAsOf.textContent = "Loading...";
+  switchTab("fund");
+  const payload = await api(
+    `/api/fund?scheme_code=${encodeURIComponent(schemeCode || "")}&fund_name=${encodeURIComponent(fundName || "")}&active=${activeFlag()}`
+  );
+  if (!payload.found) {
+    els.fundAsOf.textContent = "";
+    els.fundContent.hidden = true;
+    els.fundEmptyMessage.hidden = false;
+    state.fundRows = [];
+    return;
+  }
+  state.fundRows = payload.rows;
+  els.fundEmptyMessage.hidden = true;
+  els.fundContent.hidden = false;
+  els.fundName.textContent = payload.fund.name;
+  els.fundAsOf.textContent = `(As on ${payload.latest})`;
+  els.fundIntro.textContent =
+    `${payload.fund.name} trades compare ${payload.latest} with ${payload.previous}, with four-month share history shown at right.`;
+  renderFundSummary(payload);
+  renderFundTrades(payload);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function renderFundSummary(payload) {
+  els.fundSummaryTable.innerHTML = `
+    <thead>
+      <tr>
+        <th>Fund Family</th>
+        <th>Scheme Code</th>
+        <th>AUM (in ₹ cr)</th>
+        <th>No. of Stocks</th>
+        <th>Holding Value (₹ cr)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>${escapeHtml(payload.fund.family || "Unavailable")}</td>
+        <td class="center">${escapeHtml(payload.fund.scheme_code)}</td>
+        <td class="num">${payload.fund.latest_aum_cr == null ? "-" : formatDecimal(payload.fund.latest_aum_cr, 1)}</td>
+        <td class="num">${formatNumber(payload.fund.latest_holdings)}</td>
+        <td class="num">${formatDecimal(payload.fund.latest_value_cr, 2)}</td>
+      </tr>
+    </tbody>`;
+}
+
+function renderFundTrades(payload) {
+  const months = payload.months;
+  const monthHeaders = months.map((month) => `<th>${escapeHtml(month.label)} Shares</th>`).join("");
+  els.fundTradesTable.innerHTML = `
+    <thead>
+      <tr>
+        <th>Stock Name</th>
+        <th>Symbol</th>
+        <th>Action</th>
+        <th>Net Shares</th>
+        <th>Approx. Trade Value (₹ cr)</th>
+        <th>Adj.</th>
+        <th>% of AUM</th>
+        ${monthHeaders}
+      </tr>
+    </thead>
+    <tbody>
+      ${payload.rows
+        .map((row) => {
+          const monthCells = months
+            .map((month) => {
+              const cell = row.months[String(month.month)] || { shares: null, marker: "" };
+              return `<td class="num">${formatMaybeNumber(cell.shares)}${marker(cell.marker)}</td>`;
+            })
+            .join("");
+          return `
+            <tr>
+              <td><a href="#" data-stock="${escapeAttr(row.symbol)}">${escapeHtml(row.stock)}</a></td>
+              <td>${escapeHtml(row.symbol)}</td>
+              <td>${actionBadge(row.action)}</td>
+              <td class="num">${formatMaybeNumber(row.net_shares)}</td>
+              <td class="num">${formatMaybeDecimal(row.net_value_cr, 2)}</td>
+              <td class="center">${adjustmentLabel(row)}</td>
+              <td class="num">${row.latest_holding_pct == null ? "-" : formatDecimal(row.latest_holding_pct, 2)}</td>
+              ${monthCells}
+            </tr>`;
+        })
+        .join("")}
+    </tbody>`;
+  els.fundTradesTable.querySelectorAll("[data-stock]").forEach((link) => {
+    link.addEventListener("click", async (event) => {
+      event.preventDefault();
+      await selectStock({ symbol: link.dataset.stock, instrument_name: link.textContent, label: link.textContent });
+      switchTab("holdings");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  });
+  filterTable(els.fundTradesTable, els.fundTradeFilter.value);
+}
+
+function renderMovers(table, rows, side) {
+  const valueHead = side === "sell" ? "Approx. Sell Value (₹ cr)" : "Approx. Buy Value (₹ cr)";
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Stock Name</th>
+        <th>Symbol</th>
+        <th>Latest Funds</th>
+        <th>Previous Funds</th>
+        <th>Latest Shares</th>
+        <th>Previous Shares</th>
+        <th>Net Shares</th>
+        <th>${valueHead}</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows
+        .map(
+          (row) => `
+            <tr>
+              <td><a href="#" data-stock="${escapeAttr(row.symbol)}">${escapeHtml(row.stock)}</a></td>
+              <td>${escapeHtml(row.symbol)}</td>
+              <td class="num">${formatNumber(row.latest_funds)}</td>
+              <td class="num">${formatNumber(row.previous_funds)}</td>
+              <td class="num">${formatNumber(row.latest_shares)}</td>
+              <td class="num">${formatNumber(row.previous_shares)}</td>
+              <td class="num">${formatNumber(row.net_shares)}</td>
+              <td class="num">${formatDecimal(Math.abs(row.net_value_cr), 2)}</td>
+            </tr>`
+        )
+        .join("")}
+    </tbody>`;
+  table.querySelectorAll("[data-stock]").forEach((link) => {
+    link.addEventListener("click", async (event) => {
+      event.preventDefault();
+      await selectStock({ symbol: link.dataset.stock, instrument_name: link.textContent, label: link.textContent });
+      switchTab("holdings");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  });
+}
+
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.classList.toggle("active", tab.dataset.tab === name);
+  });
+  document.querySelectorAll(".panel").forEach((panel) => {
+    const active = panel.id === name;
+    panel.classList.toggle("active", active);
+    panel.hidden = !active;
+  });
+}
+
+function filterTable(table, query) {
+  const q = query.trim().toLowerCase();
+  table.querySelectorAll("tbody tr").forEach((row) => {
+    row.classList.toggle("hidden-row", q && !row.textContent.toLowerCase().includes(q));
+  });
+}
+
+function downloadCsv(kind) {
+  let table = els.holdingsTable;
+  let filename = "mf_holdings.csv";
+  if (kind === "buying") {
+    table = els.buyingTable;
+    filename = "mf_net_buying.csv";
+  } else if (kind === "selling") {
+    table = els.sellingTable;
+    filename = "mf_net_selling.csv";
+  } else if (kind === "fund") {
+    table = els.fundTradesTable;
+    filename = "mf_fund_trades.csv";
+  }
+  const rows = [...table.querySelectorAll("tr")].map((tr) =>
+    [...tr.children].map((cell) => `"${cell.textContent.replaceAll('"', '""').trim()}"`).join(",")
+  );
+  const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function renderSources() {
+  els.sourceFiles.innerHTML = state.meta.months
+    .map(
+      (month) =>
+        `<span class="source-pill">${escapeHtml(month.label)}${month.is_partial ? " partial" : ""} · ${escapeHtml(month.file)} · ${formatNumber(month.schemes)} schemes</span>`
+    )
+    .join("");
+}
+
+function activeFlag() {
+  return els.activeOnly.checked ? "1" : "0";
+}
+
+async function api(path) {
+  if (window.STATIC_DATA_BASE) {
+    return staticApi(path);
+  }
+  const res = await fetch(path);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Request failed: ${res.status}`);
+  }
+  const payload = await res.json();
+  if (payload.error) {
+    throw new Error(payload.error);
+  }
+  return payload;
+}
+
+async function staticApi(path) {
+  const url = new URL(path, window.location.href);
+  const dataBase = window.STATIC_DATA_BASE.replace(/\/$/, "");
+  if (url.pathname === "/api/meta") {
+    return fetchJson(`${dataBase}/meta.json`);
+  }
+  if (url.pathname === "/api/search") {
+    const all = await fetchJson(`${dataBase}/search.json`);
+    const q = (url.searchParams.get("q") || "").trim().toUpperCase();
+    if (!q) return all.slice(0, 30);
+    const terms = q.split(/\s+/);
+    return all
+      .filter((item) => terms.every((term) => `${item.symbol} ${item.instrument_name}`.toUpperCase().includes(term)))
+      .slice(0, 30);
+  }
+  if (url.pathname === "/api/holdings") {
+    const stock = (url.searchParams.get("stock") || "").toUpperCase().replace(/^NSE:/, "");
+    return fetchJson(`${dataBase}/holdings/${encodeURIComponent(stock)}.json`);
+  }
+  if (url.pathname === "/api/movers") {
+    const side = url.searchParams.get("side") === "sell" ? "sell" : "buy";
+    return fetchJson(`${dataBase}/movers_${side}.json`);
+  }
+  if (url.pathname === "/api/fund") {
+    const code = url.searchParams.get("scheme_code") || "";
+    return fetchJson(`${dataBase}/funds/${encodeURIComponent(code)}.json`);
+  }
+  throw new Error(`Unknown static endpoint: ${url.pathname}`);
+}
+
+async function fetchJson(path) {
+  const res = await fetch(path);
+  if (!res.ok) {
+    throw new Error(`Static data not found: ${path}`);
+  }
+  return res.json();
+}
+
+function marker(value) {
+  if (value === "up") return '<span class="up">▲</span>';
+  if (value === "down") return '<span class="down">▼</span>';
+  return "";
+}
+
+function actionBadge(action) {
+  const labels = {
+    new_buy: "New Buy",
+    add: "Add",
+    trim_sell: "Trim/Sell",
+    exit: "Exit",
+    hold: "Hold",
+    unknown: "Unknown",
+  };
+  return `<span class="badge badge-${escapeAttr(action)}">${escapeHtml(labels[action] || action)}</span>`;
+}
+
+function adjustmentLabel(row) {
+  const factor = Number(row.corp_action_factor || 1);
+  if (Math.abs(factor - 1) < 0.001) return "";
+  return `${formatDecimal(factor, factor % 1 === 0 ? 0 : 2)}x`;
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(Number(value || 0));
+}
+
+function formatMaybeNumber(value) {
+  if (value == null || Number.isNaN(Number(value))) return "-";
+  return formatNumber(value);
+}
+
+function formatDecimal(value, digits) {
+  return new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(Number(value || 0));
+}
+
+function formatMaybeDecimal(value, digits) {
+  if (value == null || Number.isNaN(Number(value))) return "-";
+  return formatDecimal(value, digits);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
+
+function debounce(fn, wait) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), wait);
+  };
+}
