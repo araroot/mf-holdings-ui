@@ -1,6 +1,6 @@
 # MF Holdings UI
 
-Static GitHub Pages export for RupeeVest-style mutual fund holdings and fund trade drill-downs.
+Static GitHub Pages export for MF Viewer mutual fund holdings and fund trade drill-downs.
 
 ## Data Window
 

@@ -2,8 +2,7 @@ const state = {
   meta: null,
   currentStock: null,
   holdingsRows: [],
-  buyingRows: [],
-  sellingRows: [],
+  holdingsSort: { key: null, dir: "asc" },
   fundRows: [],
 };
 
@@ -18,11 +17,6 @@ const els = {
   summaryTable: document.querySelector("#summaryTable"),
   holdingsTable: document.querySelector("#holdingsTable"),
   fundFilter: document.querySelector("#fundFilter"),
-  buyingIntro: document.querySelector("#buyingIntro"),
-  sellingIntro: document.querySelector("#sellingIntro"),
-  buyingTable: document.querySelector("#buyingTable"),
-  sellingTable: document.querySelector("#sellingTable"),
-  fundTab: document.querySelector("#fundTab"),
   fundName: document.querySelector("#fundName"),
   fundAsOf: document.querySelector("#fundAsOf"),
   fundEmptyMessage: document.querySelector("#fundEmptyMessage"),
@@ -32,8 +26,6 @@ const els = {
   fundTradesTable: document.querySelector("#fundTradesTable"),
   fundTradeFilter: document.querySelector("#fundTradeFilter"),
   backToHoldings: document.querySelector("#backToHoldings"),
-  buyingFilter: document.querySelector("#buyingFilter"),
-  sellingFilter: document.querySelector("#sellingFilter"),
   sourceFiles: document.querySelector("#sourceFiles"),
 };
 
@@ -47,14 +39,9 @@ async function init() {
   if (first.length) {
     await selectStock(first[0]);
   }
-  await loadMovers();
 }
 
 function bindEvents() {
-  document.querySelectorAll(".tab").forEach((tab) => {
-    tab.addEventListener("click", () => switchTab(tab.dataset.tab));
-  });
-
   els.stockSearch.addEventListener("input", debounce(showSuggestions, 140));
   els.stockSearch.addEventListener("focus", showSuggestions);
   document.addEventListener("click", (event) => {
@@ -66,13 +53,10 @@ function bindEvents() {
   els.activeOnly.addEventListener("change", async () => {
     if (state.currentStock) {
       await selectStock(state.currentStock);
-      await loadMovers();
     }
   });
 
   els.fundFilter.addEventListener("input", () => filterTable(els.holdingsTable, els.fundFilter.value));
-  els.buyingFilter.addEventListener("input", () => filterTable(els.buyingTable, els.buyingFilter.value));
-  els.sellingFilter.addEventListener("input", () => filterTable(els.sellingTable, els.sellingFilter.value));
   els.fundTradeFilter.addEventListener("input", () => filterTable(els.fundTradesTable, els.fundTradeFilter.value));
   els.backToHoldings.addEventListener("click", () => switchTab("holdings"));
 
@@ -122,21 +106,6 @@ async function selectStock(stock) {
   els.asOf.textContent = `(As on ${payload.months[0].label})`;
   renderSummary(payload);
   renderHoldings(payload);
-}
-
-async function loadMovers() {
-  const [buying, selling] = await Promise.all([
-    api(`/api/movers?side=buy&active=${activeFlag()}&limit=100`),
-    api(`/api/movers?side=sell&active=${activeFlag()}&limit=100`),
-  ]);
-  state.buyingRows = buying.rows;
-  state.sellingRows = selling.rows;
-  els.buyingIntro.textContent =
-    `Below is a list of stocks which have witnessed net mutual fund buying for ${buying.latest}, compared with ${buying.previous}.`;
-  els.sellingIntro.textContent =
-    `Below is a list of stocks which have witnessed net mutual fund selling for ${selling.latest}, compared with ${selling.previous}.`;
-  renderMovers(els.buyingTable, buying.rows, "buy");
-  renderMovers(els.sellingTable, selling.rows, "sell");
 }
 
 function renderSummary(payload) {
@@ -205,7 +174,11 @@ function renderHoldings(payload) {
               ${escapeHtml(row.fund_name)}
             </a>
           </td>
-          <td class="fund-family">${escapeHtml(row.fund_family || "Unavailable")}</td>
+          <td class="fund-family">
+            <a href="#" data-fund-code="${escapeAttr(row.scheme_code)}" data-fund-name="${escapeAttr(row.fund_name)}">
+              ${escapeHtml(row.fund_family || "Unavailable")}
+            </a>
+          </td>
           ${monthCells}
         </tr>`;
     })
@@ -215,12 +188,17 @@ function renderHoldings(payload) {
     <thead>
       <tr>
         <th rowspan="2">Fund Name</th>
-        <th rowspan="2">Fund Manager / Family</th>
+        <th rowspan="2" class="sortable" data-sort="fund-family" aria-sort="${sortAria("fund-family")}">
+          Fund Manager / Family <span class="sort-indicator">${
+            state.holdingsSort.key === "fund-family" ? (state.holdingsSort.dir === "asc" ? "▲" : "▼") : ""
+          }</span>
+        </th>
         ${topHeader}
       </tr>
       <tr>${subHeader}</tr>
     </thead>
     <tbody>${body}</tbody>`;
+  els.holdingsTable.querySelector("[data-sort='fund-family']").addEventListener("click", () => sortHoldingsByFamily(payload));
   els.holdingsTable.querySelectorAll("[data-fund-code]").forEach((link) => {
     link.addEventListener("click", async (event) => {
       event.preventDefault();
@@ -230,8 +208,29 @@ function renderHoldings(payload) {
   filterTable(els.holdingsTable, els.fundFilter.value);
 }
 
+function sortHoldingsByFamily(payload) {
+  const isSameSort = state.holdingsSort.key === "fund-family";
+  state.holdingsSort = {
+    key: "fund-family",
+    dir: isSameSort && state.holdingsSort.dir === "asc" ? "desc" : "asc",
+  };
+  const direction = state.holdingsSort.dir === "asc" ? 1 : -1;
+  const collator = new Intl.Collator("en-IN", { numeric: true, sensitivity: "base" });
+  payload.rows = [...payload.rows].sort((left, right) => {
+    const leftValue = `${left.fund_family || ""} ${left.fund_name || ""}`;
+    const rightValue = `${right.fund_family || ""} ${right.fund_name || ""}`;
+    return collator.compare(leftValue, rightValue) * direction;
+  });
+  state.holdingsRows = payload.rows;
+  renderHoldings(payload);
+}
+
+function sortAria(key) {
+  if (state.holdingsSort.key !== key) return "none";
+  return state.holdingsSort.dir === "asc" ? "ascending" : "descending";
+}
+
 async function selectFund(schemeCode, fundName) {
-  els.fundTab.hidden = false;
   els.fundName.textContent = fundName || "Loading...";
   els.fundAsOf.textContent = "Loading...";
   switchTab("fund");
@@ -329,52 +328,7 @@ function renderFundTrades(payload) {
   filterTable(els.fundTradesTable, els.fundTradeFilter.value);
 }
 
-function renderMovers(table, rows, side) {
-  const valueHead = side === "sell" ? "Approx. Sell Value (₹ cr)" : "Approx. Buy Value (₹ cr)";
-  table.innerHTML = `
-    <thead>
-      <tr>
-        <th>Stock Name</th>
-        <th>Symbol</th>
-        <th>Latest Funds</th>
-        <th>Previous Funds</th>
-        <th>Latest Shares</th>
-        <th>Previous Shares</th>
-        <th>Net Shares</th>
-        <th>${valueHead}</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rows
-        .map(
-          (row) => `
-            <tr>
-              <td><a href="#" data-stock="${escapeAttr(row.symbol)}">${escapeHtml(row.stock)}</a></td>
-              <td>${escapeHtml(row.symbol)}</td>
-              <td class="num">${formatNumber(row.latest_funds)}</td>
-              <td class="num">${formatNumber(row.previous_funds)}</td>
-              <td class="num">${formatNumber(row.latest_shares)}</td>
-              <td class="num">${formatNumber(row.previous_shares)}</td>
-              <td class="num">${formatNumber(row.net_shares)}</td>
-              <td class="num">${formatDecimal(Math.abs(row.net_value_cr), 2)}</td>
-            </tr>`
-        )
-        .join("")}
-    </tbody>`;
-  table.querySelectorAll("[data-stock]").forEach((link) => {
-    link.addEventListener("click", async (event) => {
-      event.preventDefault();
-      await selectStock({ symbol: link.dataset.stock, instrument_name: link.textContent, label: link.textContent });
-      switchTab("holdings");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
-  });
-}
-
 function switchTab(name) {
-  document.querySelectorAll(".tab").forEach((tab) => {
-    tab.classList.toggle("active", tab.dataset.tab === name);
-  });
   document.querySelectorAll(".panel").forEach((panel) => {
     const active = panel.id === name;
     panel.classList.toggle("active", active);
@@ -392,13 +346,7 @@ function filterTable(table, query) {
 function downloadCsv(kind) {
   let table = els.holdingsTable;
   let filename = "mf_holdings.csv";
-  if (kind === "buying") {
-    table = els.buyingTable;
-    filename = "mf_net_buying.csv";
-  } else if (kind === "selling") {
-    table = els.sellingTable;
-    filename = "mf_net_selling.csv";
-  } else if (kind === "fund") {
+  if (kind === "fund") {
     table = els.fundTradesTable;
     filename = "mf_fund_trades.csv";
   }
@@ -461,10 +409,6 @@ async function staticApi(path) {
   if (url.pathname === "/api/holdings") {
     const stock = (url.searchParams.get("stock") || "").toUpperCase().replace(/^NSE:/, "");
     return fetchJson(`${dataBase}/holdings/${encodeURIComponent(stock)}.json`);
-  }
-  if (url.pathname === "/api/movers") {
-    const side = url.searchParams.get("side") === "sell" ? "sell" : "buy";
-    return fetchJson(`${dataBase}/movers_${side}.json`);
   }
   if (url.pathname === "/api/fund") {
     const code = url.searchParams.get("scheme_code") || "";
