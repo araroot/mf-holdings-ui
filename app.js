@@ -1,9 +1,22 @@
 const state = {
   meta: null,
   currentStock: null,
+  currentHoldingsPayload: null,
+  currentFundPayload: null,
   holdingsRows: [],
   holdingsSort: { key: null, dir: "asc" },
   fundRows: [],
+  fundSort: { key: "net_value_cr", dir: "desc" },
+};
+
+const collator = new Intl.Collator("en-IN", { numeric: true, sensitivity: "base" });
+const actionLabels = {
+  new_buy: "New Buy",
+  add: "Add",
+  trim_sell: "Trim/Sell",
+  exit: "Exit",
+  hold: "Hold",
+  unknown: "Unknown",
 };
 
 const els = {
@@ -96,10 +109,12 @@ async function selectStock(stock) {
     els.holdingsContent.hidden = true;
     els.emptyMessage.hidden = false;
     state.holdingsRows = [];
+    state.currentHoldingsPayload = null;
     return;
   }
 
   state.holdingsRows = payload.rows;
+  state.currentHoldingsPayload = payload;
   els.emptyMessage.hidden = true;
   els.holdingsContent.hidden = false;
   els.stockName.textContent = `${payload.stock.name}.`;
@@ -147,13 +162,17 @@ function renderHoldings(payload) {
   const subHeader = months
     .map((month, idx) => {
       if (idx === 0) {
-        return "<th>AUM (in ₹ cr)</th><th>% of AUM</th><th>No. of Shares</th>";
+        return `
+          ${sortableHeader("holdings", "aum_cr", "AUM (in ₹ cr)")}
+          ${sortableHeader("holdings", "holding_pct", "% of AUM")}
+          ${sortableHeader("holdings", `shares:${month.month}`, "No. of Shares")}`;
       }
-      return "<th>No. of Shares</th>";
+      return sortableHeader("holdings", `shares:${month.month}`, "No. of Shares");
     })
     .join("");
 
-  const body = payload.rows
+  const rows = sortedRows(payload.rows, state.holdingsSort, holdingsSortValue);
+  const body = rows
     .map((row) => {
       const monthCells = months
         .map((month, idx) => {
@@ -187,18 +206,16 @@ function renderHoldings(payload) {
   els.holdingsTable.innerHTML = `
     <thead>
       <tr>
-        <th rowspan="2">Fund Name</th>
-        <th rowspan="2" class="sortable" data-sort="fund-family" aria-sort="${sortAria("fund-family")}">
-          Fund Manager / Family <span class="sort-indicator">${
-            state.holdingsSort.key === "fund-family" ? (state.holdingsSort.dir === "asc" ? "▲" : "▼") : ""
-          }</span>
-        </th>
+        ${sortableHeader("holdings", "fund_name", "Fund Name", 'rowspan="2"')}
+        ${sortableHeader("holdings", "fund_family", "Fund Manager / Family", 'rowspan="2"')}
         ${topHeader}
       </tr>
       <tr>${subHeader}</tr>
     </thead>
     <tbody>${body}</tbody>`;
-  els.holdingsTable.querySelector("[data-sort='fund-family']").addEventListener("click", () => sortHoldingsByFamily(payload));
+  els.holdingsTable.querySelectorAll(".sortable[data-sort]").forEach((header) => {
+    header.addEventListener("click", () => sortHoldings(payload, header.dataset.sort));
+  });
   els.holdingsTable.querySelectorAll("[data-fund-code]").forEach((link) => {
     link.addEventListener("click", async (event) => {
       event.preventDefault();
@@ -206,28 +223,6 @@ function renderHoldings(payload) {
     });
   });
   filterTable(els.holdingsTable, els.fundFilter.value);
-}
-
-function sortHoldingsByFamily(payload) {
-  const isSameSort = state.holdingsSort.key === "fund-family";
-  state.holdingsSort = {
-    key: "fund-family",
-    dir: isSameSort && state.holdingsSort.dir === "asc" ? "desc" : "asc",
-  };
-  const direction = state.holdingsSort.dir === "asc" ? 1 : -1;
-  const collator = new Intl.Collator("en-IN", { numeric: true, sensitivity: "base" });
-  payload.rows = [...payload.rows].sort((left, right) => {
-    const leftValue = `${left.fund_family || ""} ${left.fund_name || ""}`;
-    const rightValue = `${right.fund_family || ""} ${right.fund_name || ""}`;
-    return collator.compare(leftValue, rightValue) * direction;
-  });
-  state.holdingsRows = payload.rows;
-  renderHoldings(payload);
-}
-
-function sortAria(key) {
-  if (state.holdingsSort.key !== key) return "none";
-  return state.holdingsSort.dir === "asc" ? "ascending" : "descending";
 }
 
 async function selectFund(schemeCode, fundName) {
@@ -242,9 +237,11 @@ async function selectFund(schemeCode, fundName) {
     els.fundContent.hidden = true;
     els.fundEmptyMessage.hidden = false;
     state.fundRows = [];
+    state.currentFundPayload = null;
     return;
   }
   state.fundRows = payload.rows;
+  state.currentFundPayload = payload;
   els.fundEmptyMessage.hidden = true;
   els.fundContent.hidden = false;
   els.fundName.textContent = payload.fund.name;
@@ -280,22 +277,26 @@ function renderFundSummary(payload) {
 
 function renderFundTrades(payload) {
   const months = payload.months;
-  const monthHeaders = months.map((month) => `<th>${escapeHtml(month.label)} Shares</th>`).join("");
+  const monthHeaders = months
+    .map((month) => sortableHeader("fund", `shares:${month.month}`, `${month.label} Shares`))
+    .join("");
+  const rows = sortedRows(payload.rows, state.fundSort, fundSortValue);
   els.fundTradesTable.innerHTML = `
     <thead>
       <tr>
-        <th>Stock Name</th>
-        <th>Symbol</th>
-        <th>Action</th>
-        <th>Net Shares</th>
-        <th>Approx. Trade Value (₹ cr)</th>
-        <th>Adj.</th>
-        <th>% of AUM</th>
+        ${sortableHeader("fund", "stock", "Stock Name")}
+        ${sortableHeader("fund", "symbol", "Symbol")}
+        ${sortableHeader("fund", "action", "Action")}
+        ${sortableHeader("fund", "net_shares", "Net Shares")}
+        ${sortableHeader("fund", "net_value_cr", "Approx. Trade Value (₹ cr)")}
+        ${sortableHeader("fund", "corp_action_factor", "Adj.")}
+        ${sortableHeader("fund", "latest_value_cr", "Holding Value (₹ cr)")}
+        ${sortableHeader("fund", "latest_holding_pct", "% of AUM")}
         ${monthHeaders}
       </tr>
     </thead>
     <tbody>
-      ${payload.rows
+      ${rows
         .map((row) => {
           const monthCells = months
             .map((month) => {
@@ -311,12 +312,16 @@ function renderFundTrades(payload) {
               <td class="num">${formatMaybeNumber(row.net_shares)}</td>
               <td class="num">${formatMaybeDecimal(row.net_value_cr, 2)}</td>
               <td class="center">${adjustmentLabel(row)}</td>
+              <td class="num">${formatMaybeDecimal(row.latest_value_cr, 2)}</td>
               <td class="num">${row.latest_holding_pct == null ? "-" : formatDecimal(row.latest_holding_pct, 2)}</td>
               ${monthCells}
             </tr>`;
         })
         .join("")}
     </tbody>`;
+  els.fundTradesTable.querySelectorAll(".sortable[data-sort]").forEach((header) => {
+    header.addEventListener("click", () => sortFundTrades(payload, header.dataset.sort));
+  });
   els.fundTradesTable.querySelectorAll("[data-stock]").forEach((link) => {
     link.addEventListener("click", async (event) => {
       event.preventDefault();
@@ -326,6 +331,104 @@ function renderFundTrades(payload) {
     });
   });
   filterTable(els.fundTradesTable, els.fundTradeFilter.value);
+}
+
+function sortHoldings(payload, key) {
+  state.holdingsSort = nextSort(state.holdingsSort, key);
+  state.holdingsRows = sortedRows(payload.rows, state.holdingsSort, holdingsSortValue);
+  renderHoldings(payload);
+}
+
+function sortFundTrades(payload, key) {
+  state.fundSort = nextSort(state.fundSort, key);
+  state.fundRows = sortedRows(payload.rows, state.fundSort, fundSortValue);
+  renderFundTrades(payload);
+}
+
+function nextSort(current, key) {
+  if (current.key === key) {
+    return { key, dir: current.dir === "asc" ? "desc" : "asc" };
+  }
+  return { key, dir: isTextSort(key) ? "asc" : "desc" };
+}
+
+function sortableHeader(table, key, label, attrs = "") {
+  const sort = table === "fund" ? state.fundSort : state.holdingsSort;
+  const arrow = sort.key === key ? (sort.dir === "asc" ? "▲" : "▼") : "";
+  return `<th ${attrs} class="sortable" data-sort="${escapeAttr(key)}" aria-sort="${sortAria(sort, key)}">
+    ${escapeHtml(label)} <span class="sort-indicator">${arrow}</span>
+  </th>`;
+}
+
+function sortAria(sort, key) {
+  if (sort.key !== key) return "none";
+  return sort.dir === "asc" ? "ascending" : "descending";
+}
+
+function sortedRows(rows, sort, valueFn) {
+  if (!sort.key) return rows;
+  return [...rows].sort((left, right) => compareSortValues(valueFn(left, sort.key), valueFn(right, sort.key), sort.dir));
+}
+
+function compareSortValues(left, right, dir) {
+  const leftMissing = left == null || left === "" || Number.isNaN(left);
+  const rightMissing = right == null || right === "" || Number.isNaN(right);
+  if (leftMissing && rightMissing) return 0;
+  if (leftMissing) return 1;
+  if (rightMissing) return -1;
+
+  const direction = dir === "asc" ? 1 : -1;
+  if (typeof left === "number" && typeof right === "number") {
+    return (left - right) * direction;
+  }
+  return collator.compare(String(left), String(right)) * direction;
+}
+
+function holdingsSortValue(row, key) {
+  if (key === "fund_name") return row.fund_name;
+  if (key === "fund_family") return `${row.fund_family || ""} ${row.fund_name || ""}`;
+  if (key === "aum_cr") return numericValue(row.aum_cr);
+  if (key === "holding_pct") return numericValue(row.holding_pct);
+  if (key.startsWith("shares:")) return monthNumericValue(row, key, "shares");
+  return "";
+}
+
+function fundSortValue(row, key) {
+  if (key === "stock") return row.stock;
+  if (key === "symbol") return row.symbol;
+  if (key === "action") return actionText(row.action);
+  if (key === "net_shares") return absNumericValue(row.net_shares);
+  if (key === "net_value_cr") return absNumericValue(row.net_value_cr);
+  if (key === "corp_action_factor") return numericValue(row.corp_action_factor);
+  if (key === "latest_value_cr") return numericValue(row.latest_value_cr);
+  if (key === "latest_holding_pct") return numericValue(row.latest_holding_pct);
+  if (key.startsWith("shares:")) return monthNumericValue(row, key, "shares");
+  return "";
+}
+
+function monthNumericValue(row, key, field) {
+  const month = key.split(":")[1];
+  const value = row.months?.[month]?.[field];
+  return numericValue(value);
+}
+
+function numericValue(value) {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  return Number.isNaN(number) ? null : number;
+}
+
+function absNumericValue(value) {
+  const number = numericValue(value);
+  return number == null ? null : Math.abs(number);
+}
+
+function isTextSort(key) {
+  return ["fund_name", "fund_family", "stock", "symbol", "action"].includes(key);
+}
+
+function actionText(action) {
+  return actionLabels[action] || action || "";
 }
 
 function switchTab(name) {
@@ -432,15 +535,7 @@ function marker(value) {
 }
 
 function actionBadge(action) {
-  const labels = {
-    new_buy: "New Buy",
-    add: "Add",
-    trim_sell: "Trim/Sell",
-    exit: "Exit",
-    hold: "Hold",
-    unknown: "Unknown",
-  };
-  return `<span class="badge badge-${escapeAttr(action)}">${escapeHtml(labels[action] || action)}</span>`;
+  return `<span class="badge badge-${escapeAttr(action)}">${escapeHtml(actionText(action))}</span>`;
 }
 
 function adjustmentLabel(row) {
