@@ -519,7 +519,9 @@ async function staticApi(path) {
 }
 
 async function fetchJson(path) {
-  const res = await fetch(path);
+  const url = new URL(path, window.location.href);
+  if (window.STATIC_DATA_VERSION) url.searchParams.set("v", window.STATIC_DATA_VERSION);
+  const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`Static data not found: ${path}`);
   }
