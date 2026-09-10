@@ -258,7 +258,6 @@ function renderFundSummary(payload) {
     <thead>
       <tr>
         <th>Fund Family</th>
-        <th>Source Schemes</th>
         <th>AUM (in ₹ cr)</th>
         <th>No. of Stocks</th>
         <th>Holding Value (₹ cr)</th>
@@ -267,7 +266,6 @@ function renderFundSummary(payload) {
     <tbody>
       <tr>
         <td>${escapeHtml(payload.fund.family || "Unavailable")}</td>
-        <td class="center">${formatNumber(payload.fund.plan_count || 1)}</td>
         <td class="num">${payload.fund.latest_aum_cr == null ? "-" : formatDecimal(payload.fund.latest_aum_cr, 1)}</td>
         <td class="num">${formatNumber(payload.fund.latest_holdings)}</td>
         <td class="num">${formatDecimal(payload.fund.latest_value_cr, 2)}</td>
@@ -529,6 +527,7 @@ async function fetchJson(path) {
 }
 
 function marker(value) {
+  if (value === "new_entry") return '<span class="up" title="New entry" aria-label="New entry">▲</span>';
   if (value === "up") return '<span class="up">▲</span>';
   if (value === "down") return '<span class="down">▼</span>';
   return "";
