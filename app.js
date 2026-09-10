@@ -97,6 +97,7 @@ async function showSuggestions() {
 }
 
 async function selectStock(stock) {
+  document.title = `MF Viewer | ${stock.symbol}`;
   state.currentStock = stock;
   els.stockSearch.value = stock.label || `${stock.instrument_name} (${stock.symbol})`;
   els.suggestions.hidden = true;
@@ -226,6 +227,7 @@ function renderHoldings(payload) {
 }
 
 async function selectFund(schemeCode, fundName) {
+  document.title = `MF Viewer | ${fundName || "Fund Holdings"}`;
   els.fundName.textContent = fundName || "Loading...";
   els.fundAsOf.textContent = "Loading...";
   switchTab("fund");
@@ -245,6 +247,7 @@ async function selectFund(schemeCode, fundName) {
   els.fundEmptyMessage.hidden = true;
   els.fundContent.hidden = false;
   els.fundName.textContent = payload.fund.name;
+  document.title = `MF Viewer | ${payload.fund.name}`;
   els.fundAsOf.textContent = `(As on ${payload.latest})`;
   els.fundIntro.textContent =
     `${payload.fund.name} trades compare ${payload.latest} with ${payload.previous}, with four-month share history shown at right.`;
@@ -430,6 +433,7 @@ function actionText(action) {
 }
 
 function switchTab(name) {
+  if (name === "holdings") document.title = `MF Viewer | ${state.currentStock?.symbol || "Fund Holdings"}`;
   document.querySelectorAll(".panel").forEach((panel) => {
     const active = panel.id === name;
     panel.classList.toggle("active", active);
