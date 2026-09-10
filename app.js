@@ -258,7 +258,7 @@ function renderFundSummary(payload) {
     <thead>
       <tr>
         <th>Fund Family</th>
-        <th>Scheme Code</th>
+        <th>Source Schemes</th>
         <th>AUM (in ₹ cr)</th>
         <th>No. of Stocks</th>
         <th>Holding Value (₹ cr)</th>
@@ -267,7 +267,7 @@ function renderFundSummary(payload) {
     <tbody>
       <tr>
         <td>${escapeHtml(payload.fund.family || "Unavailable")}</td>
-        <td class="center">${escapeHtml(payload.fund.scheme_code)}</td>
+        <td class="center">${formatNumber(payload.fund.plan_count || 1)}</td>
         <td class="num">${payload.fund.latest_aum_cr == null ? "-" : formatDecimal(payload.fund.latest_aum_cr, 1)}</td>
         <td class="num">${formatNumber(payload.fund.latest_holdings)}</td>
         <td class="num">${formatDecimal(payload.fund.latest_value_cr, 2)}</td>
