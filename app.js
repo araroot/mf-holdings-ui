@@ -46,6 +46,11 @@ init();
 
 async function init() {
   state.meta = await api("/api/meta");
+  if (window.STATIC_DATA_BASE && state.meta.active_only) {
+    els.activeOnly.checked = true;
+    els.activeOnly.disabled = true;
+    els.activeOnly.title = "This export contains active schemes only";
+  }
   renderSources();
   bindEvents();
   const first = await api("/api/search?q=");
@@ -308,7 +313,7 @@ function renderFundTrades(payload) {
             .join("");
           return `
             <tr>
-              <td><a href="#" data-stock="${escapeAttr(row.symbol)}">${escapeHtml(row.stock)}</a></td>
+              <td>${stockLink(row)}</td>
               <td>${escapeHtml(row.symbol)}</td>
               <td class="num">${formatMaybeNumber(row.current_ptile)}</td>
               <td>${actionBadge(row.action)}</td>
@@ -334,6 +339,12 @@ function renderFundTrades(payload) {
     });
   });
   filterTable(els.fundTradesTable, els.fundTradeFilter.value);
+}
+
+function stockLink(row) {
+  return row.symbol
+    ? `<a href="#" data-stock="${escapeAttr(row.symbol)}">${escapeHtml(row.stock)}</a>`
+    : escapeHtml(row.stock);
 }
 
 function sortHoldings(payload, key) {
@@ -512,6 +523,7 @@ async function staticApi(path) {
     const terms = q.split(/\s+/);
     return all
       .filter((item) => terms.every((term) => `${item.symbol} ${item.instrument_name}`.toUpperCase().includes(term)))
+      .sort((a, b) => Number(b.symbol === q) - Number(a.symbol === q))
       .slice(0, 30);
   }
   if (url.pathname === "/api/holdings") {
