@@ -413,7 +413,7 @@ function fundSortValue(row, key) {
   if (key === "symbol") return row.symbol;
   if (key === "action") return actionText(row.action);
   if (key === "net_shares") return absNumericValue(row.net_shares);
-  if (key === "net_value_cr") return absNumericValue(row.net_value_cr);
+  if (key === "net_value_cr") return numericValue(row.net_value_cr);
   if (key === "corp_action_factor") return numericValue(row.corp_action_factor);
   if (key === "latest_value_cr") return numericValue(row.latest_value_cr);
   if (key === "latest_holding_pct") return numericValue(row.latest_holding_pct);
