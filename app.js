@@ -287,7 +287,7 @@ function renderFundTrades(payload) {
       <tr>
         ${sortableHeader("fund", "stock", "Stock Name")}
         ${sortableHeader("fund", "symbol", "Symbol")}
-        ${sortableHeader("fund", "current_ptile", `Current ptile${payload.momentum ? `<br><small>${escapeHtml(payload.momentum.price_date_label)}</small>` : ""}`, 'title="Momentum percentile: 1 is strongest, 99 weakest. Current score, not the score at purchase."')}
+        ${sortableHeader("fund", "current_ptile", `Current ptile${payload.momentum ? ` (${payload.momentum.price_date_label})` : ""}`, 'title="Momentum percentile: 1 is strongest, 99 weakest. Current score, not the score at purchase."')}
         ${sortableHeader("fund", "action", "Action")}
         ${sortableHeader("fund", "net_shares", "Net Shares")}
         ${sortableHeader("fund", "net_value_cr", "Approx. Trade Value (₹ cr)")}
