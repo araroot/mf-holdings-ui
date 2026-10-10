@@ -287,6 +287,7 @@ function renderFundTrades(payload) {
       <tr>
         ${sortableHeader("fund", "stock", "Stock Name")}
         ${sortableHeader("fund", "symbol", "Symbol")}
+        ${sortableHeader("fund", "current_ptile", `Current ptile${payload.momentum ? `<br><small>${escapeHtml(payload.momentum.price_date_label)}</small>` : ""}`, 'title="Momentum percentile: 1 is strongest, 99 weakest. Current score, not the score at purchase."')}
         ${sortableHeader("fund", "action", "Action")}
         ${sortableHeader("fund", "net_shares", "Net Shares")}
         ${sortableHeader("fund", "net_value_cr", "Approx. Trade Value (₹ cr)")}
@@ -309,6 +310,7 @@ function renderFundTrades(payload) {
             <tr>
               <td><a href="#" data-stock="${escapeAttr(row.symbol)}">${escapeHtml(row.stock)}</a></td>
               <td>${escapeHtml(row.symbol)}</td>
+              <td class="num">${formatMaybeNumber(row.current_ptile)}</td>
               <td>${actionBadge(row.action)}</td>
               <td class="num">${formatMaybeNumber(row.net_shares)}</td>
               <td class="num">${formatMaybeDecimal(row.net_value_cr, 2)}</td>
@@ -350,7 +352,7 @@ function nextSort(current, key) {
   if (current.key === key) {
     return { key, dir: current.dir === "asc" ? "desc" : "asc" };
   }
-  return { key, dir: isTextSort(key) ? "asc" : "desc" };
+  return { key, dir: isTextSort(key) || key === "current_ptile" ? "asc" : "desc" };
 }
 
 function sortableHeader(table, key, label, attrs = "") {
@@ -395,6 +397,7 @@ function holdingsSortValue(row, key) {
 }
 
 function fundSortValue(row, key) {
+  if (key === "current_ptile") return numericValue(row.current_ptile);
   if (key === "stock") return row.stock;
   if (key === "symbol") return row.symbol;
   if (key === "action") return actionText(row.action);
