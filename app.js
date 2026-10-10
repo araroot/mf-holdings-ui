@@ -516,7 +516,9 @@ async function staticApi(path) {
   }
   if (url.pathname === "/api/holdings") {
     const stock = (url.searchParams.get("stock") || "").toUpperCase().replace(/^NSE:/, "");
-    return fetchJson(`${dataBase}/holdings/${encodeURIComponent(stock)}.json`);
+    // Match export_static.safe_name; the display symbol keeps its punctuation.
+    const filename = stock.replace(/[^\p{L}\p{N}_.-]/gu, "");
+    return fetchJson(`${dataBase}/holdings/${encodeURIComponent(filename)}.json`);
   }
   if (url.pathname === "/api/fund") {
     const code = url.searchParams.get("scheme_code") || "";
