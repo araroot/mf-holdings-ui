@@ -4,7 +4,7 @@ Static GitHub Pages export for MF Viewer mutual fund holdings and fund trade dri
 
 ## Data Window
 
-- Oct-26: `Validated current snapshot` (partial)
+- Oct-26: `Published Golden MF release`
 - Sep-26: `Golden MF history`
 - Aug-26: `Golden MF history`
 - Jul-26: `Golden MF history`
